@@ -1,0 +1,54 @@
+{
+  "binance": {
+    "api_key": "",
+    "api_secret": "",
+    "note": "留空使用公共 API (仅限行情数据)"
+  },
+  "okx": {
+    "api_key": "",
+    "api_secret": "",
+    "passphrase": ""
+  },
+  "onchainos": {
+    "api_key": "",
+    "api_secret": "",
+    "passphrase": "",
+    "note": "OKX Web3 OnchainOS API — 在 https://web3.okx.com/zh-hans/onchainos/dev-docs/home/developer-portal 创建"
+  },
+  "hyperliquid": {
+    "api_url": "https://api.hyperliquid.xyz/info",
+    "note": "公共 API，无需 Key"
+  },
+  "coinank": {
+    "api_key": ""
+  },
+  "fred": {
+    "api_key": "",
+    "note": "FRED API — 在 https://fred.stlouisfed.org/docs/api/api_key.html 申请"
+  },
+  "6551": {
+    "jwt_token": "",
+    "note": "6551 OpenNews JWT Token"
+  },
+  "simmer": {
+    "api_key": ""
+  },
+  "agent_llm": {
+    "api_key": "",
+    "base_url": "https://api.openai.com/v1",
+    "model": "gpt-4o",
+    "protocol": "openai",
+    "note": "用于 Agent 圆桌会议的 LLM API"
+  },
+  "deepseek": {
+    "api_key": "",
+    "base_url": "https://api.deepseek.com/v1",
+    "model": "deepseek-chat",
+    "note": "DeepSeek Chat — 玄学分析专用"
+  },
+  "bybit": {},
+  "paper_trading": {
+    "enabled": true,
+    "balance": 10000
+  }
+}

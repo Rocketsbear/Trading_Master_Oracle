@@ -1,0 +1,26 @@
+{
+  "default": {
+    "name": "小火龙",
+    "birth_date": "",
+    "birth_time": "",
+    "birth_place": "",
+    "timezone": "Asia/Singapore",
+    "risk_tolerance": "medium",
+    "note": "填写生辰八字信息以启用玄学分析"
+  },
+  "profiles": {
+    "example_user": {
+      "name": "示例用户",
+      "birth_date": "1990-01-01",
+      "birth_time": "12:00",
+      "birth_place": "Singapore",
+      "timezone": "Asia/Singapore",
+      "risk_tolerance": "conservative"
+    }
+  },
+  "risk_tolerance_levels": {
+    "conservative": "保守型（建议仓位 5-10%）",
+    "medium": "中性型（建议仓位 10-15%）",
+    "aggressive": "激进型（建议仓位 15-20%）"
+  }
+}

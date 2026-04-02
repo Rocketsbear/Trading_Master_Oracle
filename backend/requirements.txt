@@ -1,0 +1,56 @@
+# FastAPI 核心
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+python-multipart==0.0.6
+
+# 交易所 API
+python-binance==1.0.19
+ccxt==4.2.25
+
+# 数据处理
+pandas>=2.2.0
+numpy>=2.2.6
+
+# 技术指标
+# ta-lib==0.4.28  # 暂时注释，需要手动编译
+pandas-ta==0.4.71b0
+
+# 宏观经济
+fredapi==0.5.1
+
+# HTTP 请求
+requests==2.31.0
+httpx==0.26.0
+aiohttp==3.9.1
+
+# WebSocket
+websockets==12.0
+
+# 缓存
+redis==5.0.1
+python-redis-cache==1.0.0
+
+# 数据验证
+jsonschema==4.20.0
+
+# 环境变量
+python-dotenv==1.0.0
+
+# 日期时间
+python-dateutil==2.8.2
+pytz==2023.3
+
+# 加密
+cryptography==41.0.7
+
+# AI/LLM
+anthropic==0.18.1
+openai==1.10.0
+
+# 日志
+loguru==0.7.2
+
+# 测试
+pytest==7.4.3
+pytest-asyncio==0.23.3

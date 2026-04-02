@@ -1,0 +1,251 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════
+   Trading Oracle — Premium Design System
+   ═══════════════════════════════════════════════ */
+
+:root {
+  /* Brand Colors */
+  --brand-green: #00e887;
+  --brand-blue: #00b4ff;
+  --brand-purple: #a855f7;
+  --brand-cyan: #06d6a0;
+
+  /* Semantic Colors */
+  --bull: #00e887;
+  --bear: #ff4757;
+  --neutral: #ffd93d;
+
+  /* Surface Colors */
+  --surface-0: #08090c;
+  --surface-1: #0d0f14;
+  --surface-2: #12151c;
+  --surface-3: #181c25;
+  --surface-4: #1e2330;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+
+  /* Glass */
+  --glass-bg: rgba(18, 21, 28, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 20px;
+
+  /* Text */
+  --text-primary: #f0f2f5;
+  --text-secondary: #8b95a5;
+  --text-muted: #4a5568;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Glow */
+  --glow-green: 0 0 20px rgba(0, 232, 135, 0.15), 0 0 60px rgba(0, 232, 135, 0.05);
+  --glow-blue: 0 0 20px rgba(0, 180, 255, 0.15), 0 0 60px rgba(0, 180, 255, 0.05);
+  --glow-red: 0 0 20px rgba(255, 71, 87, 0.15), 0 0 60px rgba(255, 71, 87, 0.05);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 14px;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--surface-0);
+  min-height: 100vh;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Background Grid Pattern */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(0, 232, 135, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(0, 180, 255, 0.03) 0%, transparent 50%),
+    linear-gradient(rgba(255,255,255,.01) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.01) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+/* ═══════════════════════════════════════════════
+   Glass Card Component
+   ═══════════════════════════════════════════════ */
+@layer components {
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+  }
+  .glass-card-hover:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .glass-card {
+    background: rgba(18, 20, 25, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  }
+  
+  .glass-card-accent {
+    background: rgba(22, 25, 32, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 232, 135, 0.15);
+    box-shadow: 0 8px 32px 0 rgba(0, 232, 135, 0.05);
+  }
+
+  .neon-text-green {
+    color: #00e887;
+    text-shadow: 0 0 10px rgba(0, 232, 135, 0.5), 0 0 20px rgba(0, 232, 135, 0.3);
+  }
+
+  .neon-text-red {
+    color: #ff3366;
+    text-shadow: 0 0 10px rgba(255, 51, 102, 0.5), 0 0 20px rgba(255, 51, 102, 0.3);
+  }
+
+  .neon-text-purple {
+    color: #b052ff;
+    text-shadow: 0 0 10px rgba(176, 82, 255, 0.5), 0 0 20px rgba(176, 82, 255, 0.3);
+  }
+
+  .glow-green {
+    box-shadow: var(--glow-green);
+  }
+
+  .glow-blue {
+    box-shadow: var(--glow-blue);
+  }
+
+  .glow-red {
+    box-shadow: var(--glow-red);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #00e887, #00b4ff, #b052ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% 200%;
+    animation: gradientMove 5s ease infinite;
+    background-clip: text;
+  }
+  
+  @keyframes gradientMove {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   Scrollbar
+   ═══════════════════════════════════════════════ */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ═══════════════════════════════════════════════
+   Animations
+   ═══════════════════════════════════════════════ */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes scan-line {
+  0% { top: -100%; }
+  100% { top: 100%; }
+}
+
+@keyframes score-fill {
+  from { stroke-dashoffset: 282.74; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════
+   Select Styling
+   ═══════════════════════════════════════════════ */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b95a5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
+  padding-right: 32px !important;
+  cursor: pointer;
+}
+
+select option {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}

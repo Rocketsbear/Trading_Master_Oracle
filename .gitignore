@@ -1,0 +1,61 @@
+# ========== Python ==========
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# ========== 后端运行时状态 ==========
+backend/managed_state.json
+backend/paper_positions.json
+backend/trading/backtest_results.json
+
+# ========== Node.js ==========
+node_modules/
+frontend_v2/node_modules/
+npm-debug.log*
+
+# ========== 敏感文件 (API Keys / Secrets) ==========
+config/api_keys.json
+.env
+.env.*
+*.pem
+*.key
+
+# ========== 运行时数据文件 ==========
+data/*.json
+data/*.txt
+data/reflections/*.json
+!data/.gitkeep
+!data/reflections/.gitkeep
+
+# ========== 回测 & 临时输出 ==========
+*.log
+/tmp/
+
+# ========== ML 模型权重 (可选: 如果模型太大) ==========
+# backend/trading/models/*.json
+
+# ========== 系统文件 ==========
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# ========== IDE ==========
+.vscode/
+.idea/
+*.code-workspace
+
+# ========== Gemini Agent 内部文件 ==========
+.gemini/
+.agents/skills/okx-dex-market/

@@ -1,0 +1,33 @@
+{
+  "default": {
+    "technical": 0.30,
+    "onchain": 0.25,
+    "macro": 0.20,
+    "sentiment": 0.15,
+    "metaphysical": 0.10
+  },
+  "BTC": {
+    "technical": 0.25,
+    "onchain": 0.25,
+    "macro": 0.30,
+    "sentiment": 0.15,
+    "metaphysical": 0.05,
+    "note": "BTC 作为数字黄金，宏观权重更高"
+  },
+  "ETH": {
+    "technical": 0.25,
+    "onchain": 0.35,
+    "macro": 0.15,
+    "sentiment": 0.15,
+    "metaphysical": 0.10,
+    "note": "ETH 作为世界计算机，链上权重更高"
+  },
+  "altcoin": {
+    "technical": 0.40,
+    "onchain": 0.25,
+    "macro": 0.10,
+    "sentiment": 0.20,
+    "metaphysical": 0.05,
+    "note": "山寨币波动大，技术面权重更高"
+  }
+}

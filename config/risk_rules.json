@@ -1,0 +1,23 @@
+{
+  "risk_rules": {
+    "max_position_size": 0.10,
+    "max_stop_loss": 0.03,
+    "max_daily_trades": 5,
+    "consecutive_loss_limit": 3,
+    "mandatory_stop_loss": true,
+    "min_risk_reward_ratio": 1.5,
+    "max_leverage": 3,
+    "emergency_exit_drawdown": 0.15
+  },
+  "descriptions": {
+    "max_position_size": "单笔最大仓位 10%",
+    "max_stop_loss": "最大止损 3%",
+    "max_daily_trades": "日内最大交易次数 5 次",
+    "consecutive_loss_limit": "连续亏损 3 次暂停 24h",
+    "mandatory_stop_loss": "必须设置止损",
+    "min_risk_reward_ratio": "最小盈亏比 1:1.5",
+    "max_leverage": "最大杠杆 3x",
+    "emergency_exit_drawdown": "回撤 15% 强制平仓"
+  },
+  "note": "这些规则硬编码，AI 无法覆盖"
+}
