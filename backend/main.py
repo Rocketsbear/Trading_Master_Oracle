@@ -552,21 +552,25 @@ async def quick_analyze(req: QuickAnalyzeRequest):
         
         # 1. Fetch MULTI-TIMEFRAME K-line data in parallel
         symbol = req.symbol.upper()
+        # 1. Fetch MULTI-TIMEFRAME K-line data + Fear Greed Index
+        symbol = req.symbol.upper()
+        
+        # Parallel fetch from unifying OKX-first source
+        kline_15m_task = _exchange_data.get_klines_with_fallback(symbol, req.interval, 100)
+        kline_1h_task = _exchange_data.get_klines_with_fallback(symbol, "1h", 50)
+        kline_4h_task = _exchange_data.get_klines_with_fallback(symbol, "4h", 30)
+        
+        import httpx
         async with httpx.AsyncClient(timeout=8.0) as client:
-            kline_15m, kline_1h, kline_4h, fng_resp = await asyncio.gather(
-                client.get(f"https://fapi.binance.com/fapi/v1/klines",
-                    params={"symbol": symbol, "interval": req.interval, "limit": 100}),
-                client.get(f"https://fapi.binance.com/fapi/v1/klines",
-                    params={"symbol": symbol, "interval": "1h", "limit": 50}),
-                client.get(f"https://fapi.binance.com/fapi/v1/klines",
-                    params={"symbol": symbol, "interval": "4h", "limit": 30}),
-                client.get("https://api.alternative.me/fng/?limit=1"),
-                return_exceptions=True,
+            fng_task = client.get("https://api.alternative.me/fng/?limit=1")
+            
+            klines_raw, klines_1h, klines_4h, fng_resp = await asyncio.gather(
+                kline_15m_task, kline_1h_task, kline_4h_task, fng_task, return_exceptions=True
             )
         
-        klines_raw = kline_15m.json() if not isinstance(kline_15m, Exception) else []
-        klines_1h = kline_1h.json() if not isinstance(kline_1h, Exception) else []
-        klines_4h = kline_4h.json() if not isinstance(kline_4h, Exception) else []
+        klines_raw = klines_raw if not isinstance(klines_raw, Exception) else []
+        klines_1h = klines_1h if not isinstance(klines_1h, Exception) else []
+        klines_4h = klines_4h if not isinstance(klines_4h, Exception) else []
         
         # Parse Fear & Greed Index
         fng_value = 50
@@ -845,27 +849,24 @@ async def quick_analyze(req: QuickAnalyzeRequest):
         funding_rate = 0.0
         funding_adj = 0
         try:
-            import httpx
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                fr_resp = await client.get(
-                    "https://fapi.binance.com/fapi/v1/premiumIndex",
-                    params={"symbol": symbol}
-                )
-                if fr_resp.status_code == 200:
-                    funding_rate = float(fr_resp.json().get("lastFundingRate", 0)) * 100  # Convert to %
-                    
-                    # High positive funding + going long = crowded trade → penalty
-                    if funding_rate > 0.05 and tech_score >= 60:
-                        funding_adj = -5
-                        score_breakdown.append(f"资金费率={funding_rate:.3f}%>0.05%做多惩罚-5")
-                    elif funding_rate < -0.05 and tech_score <= 40:
-                        funding_adj = -5
-                        score_breakdown.append(f"资金费率={funding_rate:.3f}%<-0.05%做空惩罚-5")
-                    elif abs(funding_rate) > 0.1:
-                        funding_adj = -3
-                        score_breakdown.append(f"资金费率异常={funding_rate:.3f}%>0.1%谨慎-3")
-                    
-                    tech_score += funding_adj
+            fr_data = await _exchange_data.get_funding_rate_with_fallback(symbol)
+            if fr_data and "funding_rate" in fr_data:
+                funding_rate = float(fr_data["funding_rate"]) * 100  # Convert to %
+                
+                src_label = fr_data.get("source", "unknown")
+                
+                # High positive funding + going long = crowded trade → penalty
+                if funding_rate > 0.05 and tech_score >= 60:
+                    funding_adj = -5
+                    score_breakdown.append(f"资金({src_label})={funding_rate:.3f}%>0.05%做多惩罚-5")
+                elif funding_rate < -0.05 and tech_score <= 40:
+                    funding_adj = -5
+                    score_breakdown.append(f"资金({src_label})={funding_rate:.3f}%<-0.05%做空惩罚-5")
+                elif abs(funding_rate) > 0.1:
+                    funding_adj = -3
+                    score_breakdown.append(f"资金率异常={funding_rate:.3f}%>0.1%谨慎-3")
+                
+                tech_score += funding_adj
         except Exception:
             pass  # Funding rate fetch is non-critical
         
@@ -951,28 +952,24 @@ async def quick_analyze(req: QuickAnalyzeRequest):
         orderbook_score = 0
         orderbook_imbalance = 1.0
         try:
-            import httpx
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                depth_resp = await client.get(
-                    "https://api.binance.com/api/v3/depth",
-                    params={"symbol": symbol, "limit": 50}
-                )
-                if depth_resp.status_code == 200:
-                    depth_data = depth_resp.json()
-                    total_bid = sum(float(b[1]) * float(b[0]) for b in depth_data.get("bids", []))
-                    total_ask = sum(float(a[1]) * float(a[0]) for a in depth_data.get("asks", []))
-                    
-                    if total_ask > 0:
-                        orderbook_imbalance = round(total_bid / total_ask, 2)
-                    
-                    if orderbook_imbalance > 1.5:
-                        orderbook_score = 5
-                        score_breakdown.append(f"订单簿买方>1.5x+5(比率{orderbook_imbalance})")
-                    elif orderbook_imbalance < 0.67:
-                        orderbook_score = -5
-                        score_breakdown.append(f"订单簿卖方>1.5x-5(比率{orderbook_imbalance})")
-                    
-                    tech_score += orderbook_score
+            book_data = await _exchange_data.get_orderbook_with_fallback(symbol, limit=50)
+            if book_data:
+                total_bid = sum(float(b[1]) * float(b[0]) for b in book_data.get("bids", []))
+                total_ask = sum(float(a[1]) * float(a[0]) for a in book_data.get("asks", []))
+                
+                if total_ask > 0:
+                    orderbook_imbalance = round(total_bid / total_ask, 2)
+                
+                src_label = book_data.get("source", "unknown")
+                
+                if orderbook_imbalance > 1.5:
+                    orderbook_score = 5
+                    score_breakdown.append(f"厚买盘({src_label})>1.5x+5(比率{orderbook_imbalance})")
+                elif orderbook_imbalance < 0.67:
+                    orderbook_score = -5
+                    score_breakdown.append(f"厚抛压({src_label})>1.5x-5(比率{orderbook_imbalance})")
+                
+                tech_score += orderbook_score
         except Exception:
             pass
         
@@ -981,35 +978,27 @@ async def quick_analyze(req: QuickAnalyzeRequest):
         ls_long_pct = 50.0
         ls_adj = 0
         try:
-            import httpx as _httpx_ls
-            async with _httpx_ls.AsyncClient(timeout=5) as ls_client:
-                # Top trader long/short ratio (account-based)
-                ls_resp = await ls_client.get(
-                    f"https://fapi.binance.com/futures/data/topLongShortAccountRatio",
-                    params={"symbol": symbol, "period": "1h", "limit": 1}
-                )
-                if ls_resp.status_code == 200:
-                    ls_data = ls_resp.json()
-                    if ls_data and len(ls_data) > 0:
-                        ls_ratio = float(ls_data[0].get("longShortRatio", 1.0))
-                        ls_long_pct = float(ls_data[0].get("longAccount", 0.5)) * 100
-                        ls_short_pct = float(ls_data[0].get("shortAccount", 0.5)) * 100
-                        
-                        # Contrarian logic: extreme crowd positioning = reversal signal
-                        if ls_long_pct > 65:
-                            # Too many longs → bearish contrarian signal
-                            ls_adj = -8
-                            score_breakdown.append(f"多空比=多头{ls_long_pct:.0f}%>65%过度拥挤→逆向-8")
-                        elif ls_long_pct > 58:
-                            ls_adj = -3
-                            score_breakdown.append(f"多空比=多头{ls_long_pct:.0f}%>58%偏多→谨慎-3")
-                        elif ls_short_pct > 65:
-                            # Too many shorts → bullish contrarian signal
-                            ls_adj = +8
-                            score_breakdown.append(f"多空比=空头{ls_short_pct:.0f}%>65%过度拥挤→逆向+8")
-                        elif ls_short_pct > 58:
-                            ls_adj = +3
-                            score_breakdown.append(f"多空比=空头{ls_short_pct:.0f}%>58%偏空→谨慎+3")
+            ls_data = await _exchange_data.get_long_short_with_fallback(symbol, period="1h", limit=1)
+            if ls_data and len(ls_data) > 0:
+                ls_ratio = float(ls_data[0].get("long_short_ratio", 1.0))
+                ls_long_pct = float(ls_data[0].get("long_ratio", 0.5)) * 100
+                ls_short_pct = float(ls_data[0].get("short_ratio", 0.5)) * 100
+                
+                # Contrarian logic: extreme crowd positioning = reversal signal
+                if ls_long_pct > 65:
+                    # Too many longs → bearish contrarian signal
+                    ls_adj = -8
+                    score_breakdown.append(f"多空比=多头{ls_long_pct:.0f}%>65%过度拥挤→逆向-8")
+                elif ls_long_pct > 58:
+                    ls_adj = -3
+                    score_breakdown.append(f"多空比=多头{ls_long_pct:.0f}%>58%偏多→谨慎-3")
+                elif ls_short_pct > 65:
+                    # Too many shorts → bullish contrarian signal
+                    ls_adj = +8
+                    score_breakdown.append(f"多空比=空头{ls_short_pct:.0f}%>65%过度拥挤→逆向+8")
+                elif ls_short_pct > 58:
+                    ls_adj = +3
+                    score_breakdown.append(f"多空比=空头{ls_short_pct:.0f}%>58%偏空→谨慎+3")
             tech_score += ls_adj
         except Exception:
             pass  # Long/short ratio fetch is non-critical

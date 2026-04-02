@@ -373,102 +373,51 @@ async def fetch_crisis_data(symbol: str) -> Dict:
     优先OKX, 失败则回退Binance.
     Returns: {"klines": [...], "current_price": float, "funding_rate": float, "ls_ratio": float}
     """
-    inst_id = symbol.replace("USDT", "-USDT")  # BTCUSDT → BTC-USDT
-
-    klines = []
+    from backend.main import _exchange_data
+    
+    klines_formatted = []
     fr = None
     ls = None
     current_price = 0
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        # 1. K-lines — try OKX first, then Binance
-        try:
-            r = await client.get("https://www.okx.com/api/v5/market/candles",
-                                 params={"instId": inst_id, "bar": "1H", "limit": "200"})
-            if r.status_code == 200:
-                raw = r.json().get("data", [])
-                for c in reversed(raw):
-                    klines.append({
-                        "ts": int(c[0]),
-                        "open": float(c[1]),
-                        "high": float(c[2]),
-                        "low": float(c[3]),
-                        "close": float(c[4]),
-                        "volume": float(c[5]),
-                    })
-        except Exception as e:
-            logger.warning(f"OKX K线失败 {symbol}: {e}, 尝试Binance...")
-
-        # Fallback: Binance klines
-        if len(klines) < 50:
-            try:
-                r = await client.get("https://api.binance.com/api/v3/klines",
-                                     params={"symbol": symbol, "interval": "1h", "limit": 200})
-                if r.status_code == 200:
-                    klines = []
-                    for c in r.json():
-                        klines.append({
-                            "ts": int(c[0]),
-                            "open": float(c[1]),
-                            "high": float(c[2]),
-                            "low": float(c[3]),
-                            "close": float(c[4]),
-                            "volume": float(c[5]),
-                        })
-                    logger.info(f"Binance K线获取成功 {symbol}: {len(klines)}根")
-            except Exception as e2:
-                logger.warning(f"Binance K线也失败 {symbol}: {e2}")
-
-        current_price = klines[-1]["close"] if klines else 0
-
-        # 2. Funding Rate — try OKX then Binance
-        try:
-            r = await client.get("https://www.okx.com/api/v5/public/funding-rate",
-                                 params={"instId": inst_id.replace("-USDT", "-USDT-SWAP")})
-            if r.status_code == 200:
-                data = r.json().get("data", [])
-                if data:
-                    fr = float(data[0].get("fundingRate", 0))
-        except Exception:
-            pass
-
-        if fr is None:
-            try:
-                r = await client.get("https://fapi.binance.com/fapi/v1/premiumIndex",
-                                     params={"symbol": symbol})
-                if r.status_code == 200:
-                    fr = float(r.json().get("lastFundingRate", 0))
-            except Exception:
-                pass
-
-        # 3. Long/Short Ratio — try OKX then Binance
-        try:
-            r = await client.get("https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio/contract-top-trader",
-                                 params={"instId": inst_id.replace("-USDT", "-USDT-SWAP"), "period": "1H"})
-            if r.status_code == 200:
-                data = r.json().get("data", [])
-                if data:
-                    ls = float(data[0].get("ratio", 1.0))
-        except Exception:
-            pass
-
-        if ls is None:
-            try:
-                r = await client.get("https://fapi.binance.com/futures/data/topLongShortAccountRatio",
-                                     params={"symbol": symbol, "period": "1h", "limit": 1})
-                if r.status_code == 200:
-                    data = r.json()
-                    if data:
-                        ls = float(data[0].get("longShortRatio", 1.0))
-            except Exception:
-                pass
+    try:
+        # 1. K-lines
+        klines_raw = await _exchange_data.get_klines_with_fallback(symbol, interval="1h", limit=200)
+        if klines_raw:
+            # exchange_data returns: [time(ms), open, high, low, close, volume, ...]
+            # crisis_scorer expects: {"ts": int, "open": float, "high": float, "low": float, "close": float, "volume": float}
+            for c in klines_raw:
+                klines_formatted.append({
+                    "ts": int(c[0]),
+                    "open": float(c[1]),
+                    "high": float(c[2]),
+                    "low": float(c[3]),
+                    "close": float(c[4]),
+                    "volume": float(c[5])
+                })
+            if klines_formatted:
+                current_price = klines_formatted[-1]["close"]
+        
+        # 2. Funding Rate
+        fr_data = await _exchange_data.get_funding_rate_with_fallback(symbol)
+        if fr_data and fr_data.get("funding_rate") is not None:
+            fr = float(fr_data["funding_rate"])
+            
+        # 3. Long/Short Ratio
+        ls_data = await _exchange_data.get_long_short_with_fallback(symbol, period="1h", limit=1)
+        if ls_data and len(ls_data) > 0:
+            ls = float(ls_data[0].get("long_short_ratio", 1.0))
+            
+    except Exception as e:
+        logger.warning(f"获取危机数据异常: {e}")
 
     return {
-        "klines": klines,
+        "klines": klines_formatted,
         "current_price": current_price,
         "funding_rate": fr,
         "ls_ratio": ls,
     }
+
 
 
 # ============================================================

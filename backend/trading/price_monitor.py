@@ -115,29 +115,11 @@ class PriceMonitor:
                 pass  # WebSocket might not be connected
     
     async def _fetch_prices(self, symbols: list) -> dict:
-        """从 Binance Futures 批量获取实时价格"""
+        """从 OKX 优先，Binance 兜底 批量获取实时价格"""
+        from backend.main import _exchange_data
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                # Use ticker/price endpoint (lightweight)
-                tasks = []
-                for s in symbols:
-                    tasks.append(
-                        client.get(
-                            "https://fapi.binance.com/fapi/v1/ticker/price",
-                            params={"symbol": s}
-                        )
-                    )
-                
-                responses = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                prices = {}
-                for i, resp in enumerate(responses):
-                    if not isinstance(resp, Exception) and resp.status_code == 200:
-                        data = resp.json()
-                        prices[symbols[i]] = float(data["price"])
-                
-                return prices
-                
+            prices = await _exchange_data.get_prices_batch(symbols)
+            return prices or {}
         except Exception as e:
             logger.warning(f"价格获取失败: {e}")
             return {}

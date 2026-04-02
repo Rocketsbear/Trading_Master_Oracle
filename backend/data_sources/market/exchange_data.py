@@ -567,6 +567,217 @@ class ExchangeDataSource:
         logger.info(f"动态雷达 (多所聚合) 探测到 Top {limit} 活跃货币: {', '.join(top_symbols)}")
         return top_symbols
     
+    # ==================== OKX-FIRST + BINANCE-FALLBACK UNIFIED METHODS ====================
+    
+    def _symbol_to_okx_inst(self, symbol: str, swap: bool = True) -> str:
+        """BTCUSDT → BTC-USDT-SWAP or BTC-USDT"""
+        coin = symbol.replace("USDT", "").replace("USD", "")
+        return f"{coin}-USDT-SWAP" if swap else f"{coin}-USDT"
+    
+    async def get_price(self, symbol: str) -> Optional[float]:
+        """
+        统一实时价格获取 — OKX 优先，Binance 兜底
+        Returns: float price or None
+        """
+        # --- OKX first ---
+        try:
+            inst_id = self._symbol_to_okx_inst(symbol)
+            data = await self._get(
+                "https://www.okx.com/api/v5/market/ticker",
+                {"instId": inst_id}
+            )
+            if data and data.get("code") == "0" and data.get("data"):
+                price = float(data["data"][0].get("last", 0))
+                if price > 0:
+                    logger.debug(f"[OKX] {symbol} 价格: {price}")
+                    return price
+        except Exception as e:
+            logger.debug(f"[OKX] 价格获取失败 {symbol}: {e}")
+        
+        # --- Binance fallback ---
+        try:
+            data = await self._get(
+                "https://fapi.binance.com/fapi/v1/ticker/price",
+                {"symbol": symbol}
+            )
+            if data and data.get("price"):
+                price = float(data["price"])
+                logger.debug(f"[Binance-Fallback] {symbol} 价格: {price}")
+                return price
+        except Exception as e:
+            logger.warning(f"[Binance-Fallback] 价格获取也失败 {symbol}: {e}")
+        
+        return None
+    
+    async def get_prices_batch(self, symbols: list) -> dict:
+        """
+        批量价格获取 — OKX 优先，Binance 兜底
+        Returns: {symbol: price, ...}
+        """
+        prices = {}
+        
+        # --- OKX batch: Use tickers endpoint ---
+        try:
+            data = await self._get(
+                "https://www.okx.com/api/v5/market/tickers",
+                {"instType": "SWAP"}
+            )
+            if data and data.get("code") == "0" and data.get("data"):
+                okx_prices = {}
+                for t in data["data"]:
+                    inst = t.get("instId", "")
+                    if inst.endswith("-USDT-SWAP"):
+                        sym = inst.replace("-USDT-SWAP", "USDT")
+                        okx_prices[sym] = float(t.get("last", 0))
+                
+                for s in symbols:
+                    if s in okx_prices and okx_prices[s] > 0:
+                        prices[s] = okx_prices[s]
+        except Exception as e:
+            logger.debug(f"[OKX] 批量价格失败: {e}")
+        
+        # --- Binance fallback for missing symbols ---
+        missing = [s for s in symbols if s not in prices]
+        if missing:
+            try:
+                client = await self._get_client()
+                tasks = [
+                    client.get("https://fapi.binance.com/fapi/v1/ticker/price", params={"symbol": s})
+                    for s in missing
+                ]
+                responses = await asyncio.gather(*tasks, return_exceptions=True)
+                for i, resp in enumerate(responses):
+                    if not isinstance(resp, Exception) and resp.status_code == 200:
+                        p = float(resp.json().get("price", 0))
+                        if p > 0:
+                            prices[missing[i]] = p
+                            logger.debug(f"[Binance-Fallback] {missing[i]} 价格: {p}")
+            except Exception as e:
+                logger.warning(f"[Binance-Fallback] 批量价格也失败: {e}")
+        
+        return prices
+    
+    async def get_klines_with_fallback(self, symbol: str, interval: str = "1h", limit: int = 200) -> Optional[List]:
+        """
+        K线获取 — OKX 优先 (合约)，Binance 兜底
+        Returns: [{time, open, high, low, close, volume}, ...]
+        """
+        # --- OKX first ---
+        try:
+            klines = await self.okx_klines(symbol, interval, limit, market_type="futures")
+            if klines and len(klines) >= min(limit * 0.5, 10):
+                logger.debug(f"[OKX] {symbol} K线({interval}): {len(klines)}条")
+                return klines
+        except Exception as e:
+            logger.debug(f"[OKX] K线获取失败 {symbol}/{interval}: {e}")
+        
+        # --- Binance fallback ---
+        try:
+            klines = await self.binance_klines(symbol, interval, limit, market_type="futures")
+            if klines:
+                logger.debug(f"[Binance-Fallback] {symbol} K线({interval}): {len(klines)}条")
+                return klines
+        except Exception as e:
+            logger.warning(f"[Binance-Fallback] K线也失败 {symbol}/{interval}: {e}")
+        
+        return None
+    
+    async def get_funding_rate_with_fallback(self, symbol: str) -> Optional[Dict]:
+        """
+        资金费率 — OKX 优先, Binance 兜底
+        Returns: {"funding_rate": float, "source": str}
+        """
+        inst_id = self._symbol_to_okx_inst(symbol)
+        
+        # --- OKX first ---
+        try:
+            result = await self.okx_funding_rate(inst_id)
+            if result and result.get("funding_rate") is not None:
+                return {"funding_rate": result["funding_rate"], "source": "okx"}
+        except Exception as e:
+            logger.debug(f"[OKX] 资金费率失败 {symbol}: {e}")
+        
+        # --- Binance fallback ---
+        try:
+            data = await self._get(
+                "https://fapi.binance.com/fapi/v1/premiumIndex",
+                {"symbol": symbol}
+            )
+            if data and data.get("lastFundingRate"):
+                rate = float(data["lastFundingRate"])
+                return {"funding_rate": rate, "source": "binance"}
+        except Exception as e:
+            logger.warning(f"[Binance-Fallback] 资金费率也失败 {symbol}: {e}")
+        
+        return None
+    
+    async def get_orderbook_with_fallback(self, symbol: str, limit: int = 50) -> Optional[Dict]:
+        """
+        订单簿 — OKX 优先, Binance 兜底
+        Returns: {"bids": [...], "asks": [...], "source": str}
+        """
+        inst_id = self._symbol_to_okx_inst(symbol)
+        
+        # --- OKX first ---
+        try:
+            data = await self._get(
+                "https://www.okx.com/api/v5/market/books",
+                {"instId": inst_id, "sz": str(limit)}
+            )
+            if data and data.get("code") == "0" and data.get("data"):
+                book = data["data"][0]
+                return {
+                    "bids": [[float(b[0]), float(b[1])] for b in book.get("bids", [])],
+                    "asks": [[float(a[0]), float(a[1])] for a in book.get("asks", [])],
+                    "source": "okx"
+                }
+        except Exception as e:
+            logger.debug(f"[OKX] 订单簿失败 {symbol}: {e}")
+        
+        # --- Binance fallback ---
+        try:
+            data = await self._get(
+                "https://api.binance.com/api/v3/depth",
+                {"symbol": symbol, "limit": limit}
+            )
+            if data:
+                return {
+                    "bids": [[float(b[0]), float(b[1])] for b in data.get("bids", [])],
+                    "asks": [[float(a[0]), float(a[1])] for a in data.get("asks", [])],
+                    "source": "binance"
+                }
+        except Exception as e:
+            logger.warning(f"[Binance-Fallback] 订单簿也失败 {symbol}: {e}")
+        
+        return None
+    
+    async def get_long_short_with_fallback(self, symbol: str, period: str = "1h", limit: int = 10) -> Optional[List]:
+        """
+        多空比 — OKX 优先, Binance 兜底
+        Returns: [{"long_ratio", "short_ratio", "long_short_ratio", "timestamp"}, ...]
+        """
+        parts = self._symbol_to_parts(symbol)
+        
+        # --- OKX first ---
+        try:
+            result = await self.okx_long_short_ratio(parts["okx_ccy"], period.upper())
+            if result and len(result) > 0:
+                logger.debug(f"[OKX] {symbol} 多空比: {len(result)}条")
+                return result
+        except Exception as e:
+            logger.debug(f"[OKX] 多空比失败 {symbol}: {e}")
+        
+        # --- Binance fallback ---
+        try:
+            result = await self.binance_long_short_ratio(symbol, period, limit)
+            if result and len(result) > 0:
+                logger.debug(f"[Binance-Fallback] {symbol} 多空比: {len(result)}条")
+                return result
+        except Exception as e:
+            logger.warning(f"[Binance-Fallback] 多空比也失败 {symbol}: {e}")
+        
+        return None
+
     async def close(self):
         if self._client and not self._client.is_closed:
             await self._client.aclose()

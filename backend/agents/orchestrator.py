@@ -123,15 +123,23 @@ class AgentOrchestrator:
                 _ex = ExchangeDataSource()
                 
                 # 并行获取: 多交易所K线(VPVR) + 综合数据(OI/FR/LS) + 订单簿
-                async def _fetch_orderbook():
-                    async with httpx.AsyncClient(timeout=3.0) as c:
-                        r = await c.get("https://api.binance.com/api/v3/depth", params={"symbol": symbol, "limit": 50})
-                        if r.status_code == 200:
-                            d = r.json()
-                            bid = sum(float(b[1]) * float(b[0]) for b in d.get("bids", []))
-                            ask = sum(float(a[1]) * float(a[0]) for a in d.get("asks", []))
-                            return {"bid_total": round(bid, 2), "ask_total": round(ask, 2), "imbalance": round(bid / ask, 2) if ask > 0 else 1.0}
-                    return None
+                # 获取实时订单簿
+                orderbook_data = {"bid_total": 0, "ask_total": 0, "imbalance": 1.0}
+                try:
+                    from backend.main import _exchange_data
+                    ob_data = await _exchange_data.get_orderbook_with_fallback(symbol, limit=20)
+                    if ob_data:
+                        bids = [float(b[1]) * float(b[0]) for b in ob_data.get("bids", [])]
+                        asks = [float(a[1]) * float(a[0]) for a in ob_data.get("asks", [])]
+                        bid_sum = sum(bids)
+                        ask_sum = sum(asks)
+                        orderbook_data = {
+                            "bid_total": round(bid_sum, 2), 
+                            "ask_total": round(ask_sum, 2), 
+                            "imbalance": round(bid_sum / ask_sum, 2) if ask_sum > 0 else 1.0
+                        }
+                except Exception as e:
+                    logger.warning(f"获取订单簿失败: {e}")
                 
                 kline_tasks = [
                     _ex.binance_klines(symbol, "1h", 200, "futures"),
