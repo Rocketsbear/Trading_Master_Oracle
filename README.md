@@ -1,6 +1,6 @@
 # Trading Oracle — 多Agent AI加密货币交易系统
 
-> **版本**: V4 | **技术栈**: FastAPI + React + Vite | **策略**: 17层评分引擎 + 5重交易门控
+> **版本**: V4 | **技术栈**: FastAPI + React + Vite | **策略**: 18层评分引擎 + 5重交易门控
 
 ## 📌 项目简介
 
@@ -229,7 +229,7 @@ Binance/OKX/Bybit/Hyperliquid（实时数据）
         ↓
    技术指标计算（RSI/MACD/BB/ADX/ATR等）
         ↓
-   17层评分引擎（0-100分）
+   18层评分引擎（0-100分）
         ↓
    V4五重门控过滤（冷却/熔断/ADX/去重/加速度）
         ↓
